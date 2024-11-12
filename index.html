@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Survival Game</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+            cursor: none;
+            background: #0a0a2a;
+        }
+        #gameInfo {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 20px;
+            font-family: Arial;
+        }
+        #characterSelect {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+            z-index: 1000;
+        }
+        .character-options {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .character-option {
+            cursor: pointer;
+            padding: 10px;
+            border: 2px solid #4488ff;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+        .character-option:hover {
+            background: rgba(68, 136, 255, 0.2);
+            transform: scale(1.05);
+        }
+        .character-option img {
+            width: 150px;
+            height: 150px;
+            object-fit: contain;
+        }
+        .character-info {
+            margin-top: 10px;
+        }
+        .character-info h3 {
+            margin: 0;
+            color: #4488ff;
+        }
+        .character-info p {
+            margin: 5px 0 0;
+            font-size: 14px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameInfo">HP: <span id="hpDisplay">100</span></div>
+    <div id="characterSelect">
+        <h2>캐릭터를 선택하세요</h2>
+        <div class="character-options">
+            <div class="character-option" onclick="selectCharacter(1)">
+                <img src="https://i.namu.wiki/i/4JEFzQ3E1uebwWw90eOKcl9HA8as03GdY0WCr65i82zWNp8h3rwqoyl8nkAA9x0HH4NTxMFvLhhuAxTgY2KjdA.png">
+                <div class="character-info">
+                    <h3>캐릭터 1</h3>
+                    <p>HP 감소: 5</p>
+                </div>
+            </div>
+            <div class="character-option" onclick="selectCharacter(2)">
+                <img src="https://i.namu.wiki/i/l5u1V2mEnrNq4HB4v0GkxbBQaBR47-uBattdyvef5Es0e864wfd_4pNQ9G4Cf7GXiYtw93Lv0LFFWtOQzBiRqQ.png">
+                <div class="character-info">
+                    <h3>캐릭터 2</h3>
+                    <p>HP 감소: 20</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const hpDisplay = document.getElementById('hpDisplay');
+        const characterSelect = document.getElementById('characterSelect');
+
+        // 캐릭터 이미지들
+        const characterImages = {
+            1: 'https://i.namu.wiki/i/4JEFzQ3E1uebwWw90eOKcl9HA8as03GdY0WCr65i82zWNp8h3rwqoyl8nkAA9x0HH4NTxMFvLhhuAxTgY2KjdA.png',
+            2: 'https://i.namu.wiki/i/l5u1V2mEnrNq4HB4v0GkxbBQaBR47-uBattdyvef5Es0e864wfd_4pNQ9G4Cf7GXiYtw93Lv0LFFWtOQzBiRqQ.png'
+        };
+
+        // 캐릭터 설정
+        const characterStats = {
+            1: { size: 80, hpLoss: 5 },
+            2: { size: 80, hpLoss: 20 }
+        };
+
+        let selectedCharacter = null;
+        let playerImage = null;
+        let gameLoop = null;
+
+        // 게임 상태
+        let gameTime = 0;
+        let gameOver = false;
+        let explosions = [];
+        let enemies = [];
+        let bullets = [];
+        let bulletTrails = [];
+
+        // 마우스 위치와 오프셋
+        let mouseX = 0;
+        let mouseY = 0;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        // 플레이어 설정
+        const player = {
+            x: canvas.width/2,
+            y: canvas.height/2,
+            size: 80,
+            hp: 100,
+            maxHp: 100,
+            speed: 5
+        };
+
+        // 무기 설정
+        const weapon = {
+            damage: 10,
+            cooldown: 0,
+            maxCooldown: 20,
+            bulletSpeed: 7,
+            maxBullets: 5
+        };
+        function selectCharacter(charNum) {
+            selectedCharacter = charNum;
+            characterSelect.style.display = 'none';
+
+            // 이미지 로드 및 게임 시작
+            playerImage = new Image();
+            playerImage.src = characterImages[charNum];
+
+            // 이미지 로드 완료 후 게임 시작
+            playerImage.onload = function() {
+                // 플레이어 설정 초기화
+                player.size = characterStats[selectedCharacter].size;
+                player.hp = 100;
+                hpDisplay.textContent = player.hp;
+
+                // 게임 상태 초기화
+                gameTime = 0;
+                gameOver = false;
+                enemies = [];
+                bullets = [];
+                bulletTrails = [];
+                explosions = [];
+
+                // 게임 시작
+                spawnEnemies();
+                startGameLoop();
+            };
+        }
+
+        // 움직임 계산 함수
+        function calculateMovement(mouseX, mouseY) {
+            const dx = mouseX - canvas.width/2;
+            const dy = mouseY - canvas.height/2;
+            const distance = Math.hypot(dx, dy);
+
+            if(distance === 0) return { x: 0, y: 0 };
+
+            return {
+                x: (dx / distance) * player.speed,
+                y: (dy / distance) * player.speed
+            };
+        }
+
+        // 배경 클래스
+        class Background {
+            constructor() {
+                this.stars = [];
+                this.initStars();
+            }
+
+            initStars() {
+                for(let i = 0; i < 100; i++) {
+                    this.stars.push({
+                        x: Math.random() * canvas.width,
+                        y: Math.random() * canvas.height,
+                        size: Math.random() * 2 + 1,
+                        speed: Math.random() * 0.5 + 0.5
+                    });
+                }
+            }
+
+            update() {
+                this.stars.forEach(star => {
+                    star.x -= offsetX * star.speed;
+                    star.y -= offsetY * star.speed;
+
+                    if(star.x < 0) star.x = canvas.width;
+                    if(star.x > canvas.width) star.x = 0;
+                    if(star.y < 0) star.y = canvas.height;
+                    if(star.y > canvas.height) star.y = 0;
+                });
+            }
+
+            draw() {
+                ctx.fillStyle = '#ffffff';
+                this.stars.forEach(star => {
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+        }
+
+        // 폭발 효과 클래스
+        class Explosion {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.particles = [];
+                this.lifetime = 20;
+                this.createParticles();
+            }
+
+            createParticles() {
+                for(let i = 0; i < 10; i++) {
+                    const angle = (Math.PI * 2 / 10) * i;
+                    this.particles.push({
+                        x: this.x,
+                        y: this.y,
+                        dx: Math.cos(angle) * 3,
+                        dy: Math.sin(angle) * 3,
+                        size: 3,
+                        alpha: 1
+                    });
+                }
+            }
+
+            update() {
+                this.lifetime--;
+                this.particles.forEach(particle => {
+                    particle.x += particle.dx;
+                    particle.y += particle.dy;
+                    particle.alpha -= 0.05;
+                    particle.size *= 0.95;
+                });
+            }
+
+            draw(ctx) {
+                this.particles.forEach(particle => {
+                    ctx.save();
+                    ctx.globalAlpha = particle.alpha;
+                    ctx.fillStyle = '#ff6600';
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+            }
+
+            isDead() {
+                return this.lifetime <= 0;
+            }
+        }
+
+        const background = new Background();
+
+        // 마우스 이벤트 처리
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+
+            const movement = calculateMovement(mouseX, mouseY);
+            offsetX = movement.x;
+            offsetY = movement.y;
+        });
+
+        // 적 생성 함수
+        function spawnEnemies() {
+            const enemyCount = 5;
+            for(let i = 0; i < enemyCount; i++) {
+                let angle = Math.random() * Math.PI * 2;
+                let distance = 400;
+
+                let enemyX = canvas.width/2 + Math.cos(angle) * distance;
+                let enemyY = canvas.height/2 + Math.sin(angle) * distance;
+
+                enemies.push({
+                    x: enemyX,
+                    y: enemyY,
+                    size: 20,
+                    speed: 1,
+                    hp: 5,
+                    damage: characterStats[selectedCharacter].hpLoss
+                });
+            }
+        }
+
+        // 총알 발사 함수
+        function shootBullet() {
+            if(weapon.cooldown <= 0 && bullets.length < weapon.maxBullets) {
+                let dx = mouseX - canvas.width/2;
+                let dy = mouseY - canvas.height/2;
+                let dist = Math.hypot(dx, dy);
+
+                if(dist === 0) return;
+
+                let newBullet = {
+                    x: canvas.width/2,
+                    y: canvas.height/2,
+                    dx: (dx/dist) * weapon.bulletSpeed,
+                    dy: (dy/dist) * weapon.bulletSpeed,
+                    bounced: false
+                };
+
+                bullets.push(newBullet);
+                bulletTrails.push({
+                    positions: [[newBullet.x, newBullet.y]],
+                    maxLength: 10
+                });
+
+                weapon.cooldown = weapon.maxCooldown;
+            }
+        }
+
+        // 충돌 감지 함수
+        function checkCollisions() {
+            enemies.forEach(enemy => {
+                let dist = Math.hypot(enemy.x - canvas.width/2, enemy.y - canvas.height/2);
+                if(dist < (player.size + enemy.size) / 2) {
+                    player.hp -= enemy.damage;
+                    hpDisplay.textContent = player.hp;
+                    if(player.hp <= 0) {
+                        gameOver = true;
+                    }
+                }
+            });
+
+            bullets.forEach((bullet, bulletIndex) => {
+                enemies.forEach((enemy, enemyIndex) => {
+                    let dist = Math.hypot(enemy.x - bullet.x, enemy.y - bullet.y);
+                    if(dist < enemy.size/2) {
+                        enemy.hp -= weapon.damage;
+                        if(enemy.hp <= 0) {
+                            explosions.push(new Explosion(enemy.x, enemy.y));
+                            enemies.splice(enemyIndex, 1);
+                        }
+                    }
+                });
+            });
+        }
+
+        function startGameLoop() {
+            function loop() {
+                if(gameOver) {
+                    ctx.fillStyle = 'black';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = 'red';
+                    ctx.font = '48px Arial';
+                    ctx.fillText('Game Over', canvas.width/2 - 100, canvas.height/2);
+                    return;
+                }
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                background.update();
+                background.draw();
+
+                // 플레이어 그리기
+                ctx.save();
+                ctx.translate(canvas.width/2, canvas.height/2);
+                if(mouseX < canvas.width/2) {
+                    ctx.scale(-1, 1);
+                }
+                ctx.drawImage(
+                    playerImage, 
+                    -player.size/2, 
+                    -player.size/2,
+                    player.size,
+                    player.size
+                );
+                ctx.restore();
+
+                // 조준선 그리기
+                let aimDx = mouseX - canvas.width/2;
+                let aimDy = mouseY - canvas.height/2;
+                let aimDist = Math.hypot(aimDx, aimDy);
+                if(aimDist > 0) {
+                    ctx.strokeStyle = '#4488ff55';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(canvas.width/2, canvas.height/2);
+                    ctx.lineTo(
+                        canvas.width/2 + (aimDx/aimDist) * 30,
+                        canvas.height/2 + (aimDy/aimDist) * 30
+                    );
+                    ctx.stroke();
+                }
+
+                // 적 이동 및 그리기
+                enemies.forEach(enemy => {
+                    enemy.x -= offsetX;
+                    enemy.y -= offsetY;
+
+                    let dx = canvas.width/2 - enemy.x;
+                    let dy = canvas.height/2 - enemy.y;
+                    let dist = Math.hypot(dx, dy);
+
+                    enemy.x += (dx/dist) * enemy.speed;
+                    enemy.y += (dy/dist) * enemy.speed;
+
+                    ctx.fillStyle = '#ff4444';
+                    ctx.beginPath();
+                    ctx.arc(enemy.x, enemy.y, enemy.size/2, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                // 총알 업데이트 및 그리기
+                bullets.forEach((bullet, index) => {
+                    bullet.x += bullet.dx - offsetX;
+                    bullet.y += bullet.dy - offsetY;
+
+                    bulletTrails[index].positions.unshift([bullet.x, bullet.y]);
+                    if(bulletTrails[index].positions.length > bulletTrails[index].maxLength) {
+                        bulletTrails[index].positions.pop();
+                    }
+
+                    if(!bullet.bounced) {
+                        if(bullet.x < 0 || bullet.x > canvas.width) {
+                            bullet.dx = -bullet.dx;
+                            bullet.bounced = true;
+                        }
+                        if(bullet.y < 0 || bullet.y > canvas.height) {
+                            bullet.dy = -bullet.dy;
+                            bullet.bounced = true;
+                        }
+                    } else if(bullet.x < 0 || bullet.x > canvas.width || 
+                             bullet.y < 0 || bullet.y > canvas.height) {
+                        bullets.splice(index, 1);
+                        bulletTrails.splice(index, 1);
+                        return;
+                    }
+
+                    // 총알 잔상 그리기
+                    ctx.beginPath();
+                    ctx.strokeStyle = '#00ff88';
+                    ctx.lineWidth = 2;
+                    bulletTrails[index].positions.forEach((pos, i) => {
+                        if(i === 0) {
+                            ctx.moveTo(pos[0], pos[1]);
+                        } else {
+                            ctx.lineTo(pos[0], pos[1]);
+                        }
+                        ctx.globalAlpha = 1 - (i / bulletTrails[index].maxLength);
+                    });
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+
+                    // 총알 그리기
+                    ctx.fillStyle = '#00ff88';
+                    ctx.beginPath();
+                    ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                // 폭발 효과 업데이트 및 그리기
+                explosions = explosions.filter(explosion => {
+                    explosion.update();
+                    explosion.draw(ctx);
+                    return !explosion.isDead();
+                });
+
+                // 무기 쿨다운 감소
+                if(weapon.cooldown > 0) weapon.cooldown--;
+
+                // 총알 발사
+                shootBullet();
+
+                // 충돌 감지
+                checkCollisions();
+
+                // 게임 시간 증가
+                gameTime++;
+
+                // 주기적으로 적 생성
+                if(gameTime % 300 === 0) {
+                    spawnEnemies();
+                }
+
+                requestAnimationFrame(loop);
+            }
+            loop();
+        }
+        </script>
+        </body>
+        </html>
