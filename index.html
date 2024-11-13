@@ -130,6 +130,7 @@
             hp: 100,
             maxHp: 100,
             speed: 5
+            damageCooldown: 0  // 데미지 쿨다운 추가
         };
 
         // 무기 설정
@@ -337,10 +338,16 @@
 
         // 충돌 감지 함수
         function checkCollisions() {
+// 데미지 쿨다운 감소
+    if(player.damageCooldown > 0) {
+        player.damageCooldown--;
+    }
+            
             enemies.forEach(enemy => {
                 let dist = Math.hypot(enemy.x - canvas.width/2, enemy.y - canvas.height/2);
                 if(dist < (player.size + enemy.size) / 2) {
                     player.hp -= enemy.damage;
+                    player.damageCooldown = 30; // 30프레임(약 0.5초) 동안 무적
                     hpDisplay.textContent = player.hp;
                     if(player.hp <= 0) {
                         gameOver = true;
