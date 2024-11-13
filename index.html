@@ -70,14 +70,14 @@
         <h2>캐릭터를 선택하세요</h2>
         <div class="character-options">
             <div class="character-option" onclick="selectCharacter(1)">
-                <img src="https://i.namu.wiki/i/4JEFzQ3E1uebwWw90eOKcl9HA8as03GdY0WCr65i82zWNp8h3rwqoyl8nkAA9x0HH4NTxMFvLhhuAxTgY2KjdA.png">
+                <img src="img/zennaro.png">
                 <div class="character-info">
                     <h3>캐릭터 1</h3>
                     <p>HP 감소: 5</p>
                 </div>
             </div>
             <div class="character-option" onclick="selectCharacter(2)">
-                <img src="https://i.namu.wiki/i/l5u1V2mEnrNq4HB4v0GkxbBQaBR47-uBattdyvef5Es0e864wfd_4pNQ9G4Cf7GXiYtw93Lv0LFFWtOQzBiRqQ.png">
+                <img src="img/ladonna.png">
                 <div class="character-info">
                     <h3>캐릭터 2</h3>
                     <p>HP 감소: 20</p>
@@ -85,7 +85,7 @@
             </div>
         </div>
     </div>
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <canvas id="gameCanvas" width="1024" height="600"></canvas>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -94,8 +94,8 @@
 
         // 캐릭터 이미지들
         const characterImages = {
-            1: 'https://i.namu.wiki/i/4JEFzQ3E1uebwWw90eOKcl9HA8as03GdY0WCr65i82zWNp8h3rwqoyl8nkAA9x0HH4NTxMFvLhhuAxTgY2KjdA.png',
-            2: 'https://i.namu.wiki/i/l5u1V2mEnrNq4HB4v0GkxbBQaBR47-uBattdyvef5Es0e864wfd_4pNQ9G4Cf7GXiYtw93Lv0LFFWtOQzBiRqQ.png'
+            1: 'img/zennaro.png',
+            2: 'img/ladonna.png'
         };
 
         // 캐릭터 설정
